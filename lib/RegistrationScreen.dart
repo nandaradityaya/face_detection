@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
+import 'package:image_picker_flutter/ML/Recognition.dart';
+import 'package:image_picker_flutter/ML/Recognizer.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({Key? key}) : super(key: key);
@@ -22,6 +24,7 @@ class _HomePageState extends State<RegistrationScreen> {
   late FaceDetector faceDetector;
 
   // declare face recognizer
+  late Recognizer recognizer;
 
   @override
   void initState() {
@@ -37,6 +40,7 @@ class _HomePageState extends State<RegistrationScreen> {
     faceDetector = FaceDetector(options: options);
 
     // initialize face recognizer
+    recognizer = Recognizer();
   }
 
   // capture image using camera
@@ -69,6 +73,8 @@ class _HomePageState extends State<RegistrationScreen> {
     // remove rotation of camera images
     InputImage inputImage = InputImage.fromFile(_image!);
 
+    // image = await _image?.readAsBytes();
+    image = await decodeImageFromList(_image!.readAsBytesSync());
     // passing input to face detector and getting detected faces
     faces = await faceDetector.processImage(inputImage);
 
@@ -76,6 +82,31 @@ class _HomePageState extends State<RegistrationScreen> {
       final Rect boundingBox = face.boundingBox;
 
       print("Rect = " + boundingBox.toString());
+
+      // declare variable
+      num left = boundingBox.left < 0 ? 0 : boundingBox.left;
+      num top = boundingBox.top < 0 ? 0 : boundingBox.top;
+      num right =
+          boundingBox.right > image.width ? image.width - 1 : boundingBox.right;
+      num bottom = boundingBox.bottom > image.height
+          ? image.height - 1
+          : boundingBox.bottom;
+      num width = right - left;
+      num height = bottom - top;
+
+      final bytes = _image!.readAsBytesSync();
+      img.Image? faceImg = img.decodeImage(bytes!);
+
+      // crop image
+      img.Image croppedFace = img.copyCrop(faceImg!,
+          x: left.toInt(),
+          y: top.toInt(),
+          width: width.toInt(),
+          height: height.toInt());
+
+      Recognition recognition = recognizer.recognize(croppedFace, boundingBox);
+      showFaceRegistrationDialogue(
+          Uint8List.fromList(img.encodeBmp(croppedFace)), recognition);
     }
     drawRectangleAroundFaces();
 
@@ -93,52 +124,64 @@ class _HomePageState extends State<RegistrationScreen> {
   // perform Face Recognition
 
   // Face Registration Dialogue
-  // TextEditingController textEditingController = TextEditingController();
-  // showFaceRegistrationDialogue(Uint8List cropedFace, Recognition recognition){
-  //   showDialog(
-  //     context: context,
-  //     builder: (ctx) => AlertDialog(
-  //       title: const Text("Face Registration",textAlign: TextAlign.center),alignment: Alignment.center,
-  //       content: SizedBox(
-  //         height: 340,
-  //         child: Column(
-  //           crossAxisAlignment: CrossAxisAlignment.center,
-  //           children: [
-  //             const SizedBox(height: 20,),
-  //             Image.memory(
-  //               cropedFace,
-  //               width: 200,
-  //               height: 200,
-  //             ),
-  //             SizedBox(
-  //               width: 200,
-  //               child: TextField(
-  //                 controller: textEditingController,
-  //                   decoration: const InputDecoration( fillColor: Colors.white, filled: true,hintText: "Enter Name")
-  //               ),
-  //             ),
-  //             const SizedBox(height: 10,),
-  //             ElevatedButton(
-  //                 onPressed: () {
-  //                   recognizer.registerFaceInDB(textEditingController.text, recognition.embeddings);
-  //                   textEditingController.text = "";
-  //                   Navigator.pop(context);
-  //                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-  //                     content: Text("Face Registered"),
-  //                   ));
-  //                 },style: ElevatedButton.styleFrom(primary:Colors.blue,minimumSize: const Size(200,40)),
-  //                 child: const Text("Register"))
-  //           ],
-  //         ),
-  //       ),contentPadding: EdgeInsets.zero,
-  //     ),
-  //   );
-  // }
+  TextEditingController textEditingController = TextEditingController();
+  showFaceRegistrationDialogue(Uint8List cropedFace, Recognition recognition) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Face Registration", textAlign: TextAlign.center),
+        alignment: Alignment.center,
+        content: SizedBox(
+          height: 340,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(
+                height: 20,
+              ),
+              Image.memory(
+                cropedFace,
+                width: 200,
+                height: 200,
+              ),
+              SizedBox(
+                width: 200,
+                child: TextField(
+                    controller: textEditingController,
+                    decoration: const InputDecoration(
+                        fillColor: Colors.white,
+                        filled: true,
+                        hintText: "Enter Name")),
+              ),
+              const SizedBox(
+                height: 10,
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  recognizer.registerFaceInDB(textEditingController.text,
+                      recognition.embeddings.join(','));
+                  textEditingController.text = "";
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text("Face Registered"),
+                  ));
+                },
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    minimumSize: const Size(200, 40)),
+                child: const Text("Register"),
+              )
+            ],
+          ),
+        ),
+        contentPadding: EdgeInsets.zero,
+      ),
+    );
+  }
+
   // draw rectangles
   var image;
   drawRectangleAroundFaces() async {
-    image = await _image?.readAsBytes();
-    image = await decodeImageFromList(image);
     print("${image.width}   ${image.height}");
     setState(() {
       image;
