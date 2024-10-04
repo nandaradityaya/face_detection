@@ -10,12 +10,12 @@ import 'Recognition.dart';
 class Recognizer {
   late Interpreter interpreter;
   late InterpreterOptions _interpreterOptions;
-  static const int WIDTH = 112;
-  static const int HEIGHT = 112;
+  static const int WIDTH = 160;
+  static const int HEIGHT = 160;
   final dbHelper = DatabaseHelper();
   Map<String, Recognition> registered = Map();
   @override
-  String get modelName => 'assets/mobile_face_net.tflite';
+  String get modelName => 'assets/facenet.tflite';
 
   Recognizer({int? numThreads}) {
     _interpreterOptions = InterpreterOptions();
@@ -78,8 +78,8 @@ class Recognizer {
         .toList();
     Float32List float32Array = Float32List.fromList(flattenedList);
     int channels = 3;
-    int height = 112;
-    int width = 112;
+    int height = HEIGHT;
+    int width = WIDTH;
     Float32List reshapedArray = Float32List(1 * height * width * channels);
     for (int c = 0; c < channels; c++) {
       for (int h = 0; h < height; h++) {
@@ -90,34 +90,34 @@ class Recognizer {
         }
       }
     }
-    return reshapedArray.reshape([1, 112, 112, 3]);
+    return reshapedArray.reshape([1, 160, 160, 3]);
   }
 
   Recognition recognize(img.Image image, Rect location) {
-    //TODO crop face from image resize it and convert it to float array
+    // crop face from image resize it and convert it to float array
     var input = imageToArray(image);
     print(input.shape.toString());
 
-    //TODO output array
-    List output = List.filled(1 * 192, 0).reshape([1, 192]);
+    // output array
+    List output = List.filled(1 * 512, 0).reshape([1, 512]);
 
-    //TODO performs inference
+    // performs inference
     final runs = DateTime.now().millisecondsSinceEpoch;
     interpreter.run(input, output);
     final run = DateTime.now().millisecondsSinceEpoch - runs;
     print('Time to run inference: $run ms$output');
 
-    //TODO convert dynamic list to double list
+    // convert dynamic list to double list
     List<double> outputArray = output.first.cast<double>();
 
-    //TODO looks for the nearest embeeding in the database and returns the pair
+    // looks for the nearest embeeding in the database and returns the pair
     Pair pair = findNearest(outputArray);
     print("distance= ${pair.distance}");
 
     return Recognition(pair.name, location, outputArray, pair.distance);
   }
 
-  //TODO  looks for the nearest embeeding in the database and returns the pair which contain information of registered face with which face is most similar
+  //  looks for the nearest embeeding in the database and returns the pair which contain information of registered face with which face is most similar
   findNearest(List<double> emb) {
     Pair pair = Pair("Unknown", -5);
     for (MapEntry<String, Recognition> item in registered.entries) {
