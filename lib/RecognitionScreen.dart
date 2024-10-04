@@ -68,10 +68,12 @@ class _HomePageState extends State<RecognitionScreen> {
 
   // face detection code here
   List<Face> faces = [];
+  List<Recognition> recognitions = [];
 
   doFaceDetection() async {
     // remove rotation of camera images
     InputImage inputImage = InputImage.fromFile(_image!);
+    recognitions.clear(); // clear previous image
 
     // image = await _image?.readAsBytes();
     image = await decodeImageFromList(_image!.readAsBytesSync());
@@ -105,6 +107,14 @@ class _HomePageState extends State<RecognitionScreen> {
           height: height.toInt());
 
       Recognition recognition = recognizer.recognize(croppedFace, boundingBox);
+
+      // jika distance mukanya lebih dari 1.25 maka dia tidak dikenali
+      if (recognition.distance > 1.25) {
+        recognition.name = "Unknown";
+      }
+
+      recognitions.add(recognition);
+      print("Recognized faces " + recognition.name);
       // showFaceRegistrationDialogue(
       //     Uint8List.fromList(img.encodeBmp(croppedFace)), recognition);
     }
@@ -185,7 +195,7 @@ class _HomePageState extends State<RecognitionScreen> {
     print("${image.width}   ${image.height}");
     setState(() {
       image;
-      faces;
+      recognitions;
     });
   }
 
@@ -214,8 +224,8 @@ class _HomePageState extends State<RecognitionScreen> {
                       width: image.width.toDouble(),
                       height: image.width.toDouble(),
                       child: CustomPaint(
-                        painter:
-                            FacePainter(facesList: faces, imageFile: image),
+                        painter: FacePainter(
+                            facesList: recognitions, imageFile: image),
                       ),
                     ),
                   ),
@@ -279,7 +289,7 @@ class _HomePageState extends State<RecognitionScreen> {
 }
 
 class FacePainter extends CustomPainter {
-  List<Face> facesList;
+  List<Recognition> facesList;
   dynamic imageFile;
   FacePainter({required this.facesList, @required this.imageFile});
 
@@ -294,8 +304,21 @@ class FacePainter extends CustomPainter {
     p.style = PaintingStyle.stroke;
     p.strokeWidth = 3;
 
-    for (Face face in facesList) {
-      canvas.drawRect(face.boundingBox, p);
+    for (Recognition face in facesList) {
+      canvas.drawRect(face.location, p);
+
+      TextSpan textSpan = TextSpan(
+        text: face.name,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 30,
+        ),
+      );
+
+      TextPainter tp =
+          TextPainter(text: textSpan, textDirection: TextDirection.ltr);
+      tp.layout();
+      tp.paint(canvas, Offset(face.location.left, face.location.top));
     }
   }
 
